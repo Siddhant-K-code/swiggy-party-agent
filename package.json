@@ -1,0 +1,34 @@
+{
+  "name": "swiggy-party-agent",
+  "version": "1.0.0",
+  "description": "AI agent that reads team food preferences from a spreadsheet and builds a Swiggy cart for the team lead to confirm and place.",
+  "type": "module",
+  "bin": {
+    "party-agent": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.0",
+    "ai": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "csv-parse": "^5.5.6",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "inquirer": "^10.0.0",
+    "zod": "^3.23.8",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/inquirer": "^9.0.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
