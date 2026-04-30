@@ -9,64 +9,102 @@ Built on [Swiggy Builders Club](https://mcp.swiggy.com/builders/) MCP + Vercel A
 ## How it works
 
 ```
-Google Form → CSV export → party-agent CLI → Swiggy MCP → Cart → Confirm → Order placed
+Google Form → CSV export → party-agent → Swiggy MCP → Cart → Confirm → Order placed
 ```
 
 1. Share a Google Form: name, dietary restrictions, cuisine preferences, spice level.
 2. Team fills it in. Export responses as CSV from Google Sheets.
-3. Run `party-agent --csv responses.csv`. The agent:
+3. Run the agent (CLI, Slack bot, web app, or MCP server — pick your surface). The agent:
    - Resolves the office delivery address via `get_addresses`
    - Finds a restaurant that fits the group via `search_restaurants`
    - Picks a dish per person via `search_menu`
    - Builds the full cart in one `update_food_cart` call
    - Applies the best available COD coupon
-4. CLI prints a per-person breakdown. You confirm.
+4. The agent presents a per-person breakdown. You confirm.
 5. Agent calls `place_food_order`.
 
 The agent never places an order on its own. Cart building and order placement are separate steps.
 
 ---
 
+## Integration surfaces
+
+The core agent logic lives in `src/agent.ts` and is surface-agnostic. The same `buildCartForGroup` and `placeOrder` functions work across every integration below.
+
+### CLI (included)
+
+Run it from a terminal. Best for one-off events or testing.
+
+```bash
+npm run dev -- --csv responses.csv --event "v2.0 Launch" --address "Office" --budget 250
+```
+
+### Slack bot
+
+Wire the agent to a Slack slash command or workflow. The team lead runs `/party-order` in the team channel, the bot posts the cart summary as a message with Approve / Skip buttons, and calls `placeOrder` on approval.
+
+```
+/party-order event="v2.0 Launch" csv=<Google Sheets URL>
+```
+
+Suggested stack: Slack Bolt (Node.js) + Block Kit for the confirmation UI. The agent reads the sheet via Google Sheets API instead of a local CSV export.
+
+### Web app
+
+A Next.js app where the team lead pastes a Google Sheets link, reviews the AI-built cart in a table UI, edits individual items if needed, and clicks Place Order. Each team member's row is editable before confirmation.
+
+Suggested stack: Next.js + Tailwind + Swiggy MCP on the server side.
+
+### MCP server (expose as a tool)
+
+Expose `buildPartyCart` and `placePartyOrder` as MCP tools so any MCP-compatible AI client (Claude Desktop, Cursor, etc.) can trigger a team order from a conversation.
+
+```
+User: "Order lunch for the team. Here's the sheet: <url>"
+Agent: [calls buildPartyCart tool] → presents summary → [calls placePartyOrder on confirmation]
+```
+
+Suggested stack: `@modelcontextprotocol/sdk` server, two tools, same agent logic underneath.
+
+### Scheduled (cron)
+
+Run every Friday at noon. Pull the latest sheet responses, build the cart, post the summary to Slack for approval. If no one rejects within 30 minutes, place the order automatically.
+
+Suggested stack: GitHub Actions cron + Slack incoming webhook for the approval window.
+
+---
+
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     party-agent CLI                     │
-│                      src/cli.ts                         │
-└──────────────┬──────────────────────────────────────────┘
-               │
-       ┌───────▼────────┐         ┌──────────────────────┐
-       │  CSV Parser    │         │   Swiggy Party Agent  │
-       │  src/parser.ts │         │   src/agent.ts        │
-       │                │         │                       │
-       │ • Reads CSV    │         │ • Vercel AI SDK       │
-       │ • Normalises   │         │ • Anthropic (config.) │
-       │   diet tags    │         │ • Swiggy Food MCP     │
-       │ • Splits into  │         │                       │
-       │   cap groups   │         │                       │
-       └───────┬────────┘         └──────────┬────────────┘
-               │                             │
-               └─────────────┬───────────────┘
-                             │
-               ┌─────────────▼───────────────┐
-               │     Swiggy Food MCP Server   │
-               │   https://mcp.swiggy.com/food│
-               │                             │
-               │  get_addresses              │
-               │  search_restaurants         │
-               │  get_restaurant_menu        │
-               │  search_menu                │
-               │  update_food_cart           │
-               │  fetch_food_coupons         │
-               │  apply_food_coupon          │
-               │  get_food_cart              │
-               │  place_food_order           │
-               └─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Integration Surface                        │
+│         CLI  │  Slack Bot  │  Web App  │  MCP Server  │  Cron    │
+└──────────────────────────────┬───────────────────────────────────┘
+                               │
+               ┌───────────────▼───────────────┐
+               │          src/agent.ts          │
+               │                               │
+               │  buildCartForGroup()           │
+               │  placeOrder()                 │
+               └───────────────┬───────────────┘
+                               │
+       ┌───────────────────────┼───────────────────────┐
+       │                       │                       │
+┌──────▼──────┐        ┌───────▼───────┐     ┌────────▼────────┐
+│ src/parser  │        │  Vercel AI SDK │     │  Swiggy Food    │
+│             │        │  + Anthropic   │     │  MCP Server     │
+│ CSV / Sheets│        │  (any model)   │     │                 │
+│ → TeamMember│        │                │     │ get_addresses   │
+│ []          │        │                │     │ search_*        │
+└─────────────┘        └───────────────┘     │ update_cart     │
+                                             │ place_order     │
+                                             └─────────────────┘
 ```
 
 ### Cart cap
 
-Defaults to ₹5000 per order, configurable via `--cap`. Large teams are split into groups automatically — each group gets its own cart and confirmation prompt.
+Defaults to ₹5000 per order, configurable via `--cap` (CLI) or the `cartCap` parameter (programmatic). Large teams split into groups automatically — each group gets its own cart and confirmation step.
 
 Swiggy Builders Club v1 sandbox accounts have a ₹1000 hard cap. Pass `--cap 1000` if you're on a sandbox `client_id`.
 
@@ -100,6 +138,9 @@ Edit `.env`:
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
 SWIGGY_ACCESS_TOKEN=eyJhbGci...   # from Swiggy OAuth flow
+
+# Optional — any Anthropic model ID. Defaults to claude-opus-4-5.
+# ANTHROPIC_MODEL=claude-3-5-haiku-20241022
 ```
 
 ### Get a Swiggy access token
@@ -114,7 +155,7 @@ Tokens last 5 days. Re-run the OAuth flow when one expires.
 
 ---
 
-## Usage
+## CLI usage
 
 ### 1. Create the Google Form
 
@@ -128,7 +169,7 @@ In Google Sheets: **File → Download → Comma Separated Values (.csv)**
 
 See [`examples/responses.csv`](./examples/responses.csv) for the expected format.
 
-### 3. Run the agent
+### 3. Run
 
 ```bash
 npm run dev -- --csv responses.csv --event "v2.0 Launch Party" --address "Office" --budget 250
@@ -153,8 +194,6 @@ node dist/cli.js --csv responses.csv --event "v2.0 Launch Party" --address "Offi
 
 ### 4. Confirm and place
 
-The CLI prints a per-person breakdown for each group:
-
 ```
   Order 1 of 2 — Biryani House
   ─────────────────────────────────────────
@@ -172,13 +211,37 @@ The CLI prints a per-person breakdown for each group:
 
 ---
 
+## Programmatic usage
+
+Import the agent directly to build any integration:
+
+```ts
+import { buildCartForGroup, placeOrder } from "./src/agent.js";
+import { parseCSV, splitIntoGroups } from "./src/parser.js";
+
+const members = parseCSV("responses.csv");
+const groups = splitIntoGroups(members, 250, 5000);
+
+for (let i = 0; i < groups.length; i++) {
+  const summary = await buildCartForGroup(
+    groups[i], "Office", 250, i, groups.length, 5000
+  );
+
+  // present summary via your surface (Slack, web, etc.)
+  // then on confirmation:
+  const orderId = await placeOrder(summary, 5000);
+}
+```
+
+---
+
 ## Project structure
 
 ```
 swiggy-party-agent/
 ├── src/
-│   ├── cli.ts        # Argument parsing, display, confirmation loop
-│   ├── agent.ts      # Cart building and order placement via Swiggy MCP
+│   ├── cli.ts        # CLI entrypoint
+│   ├── agent.ts      # buildCartForGroup(), placeOrder() — surface-agnostic
 │   ├── parser.ts     # Google Form CSV → TeamMember[]
 │   └── types.ts      # Shared types
 ├── examples/
