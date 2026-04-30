@@ -224,7 +224,7 @@ The agent prompt enforces these strictly: a member tagged `vegetarian` will only
 
 - [Swiggy Builders Club](https://mcp.swiggy.com/builders/) — Food MCP server (35 tools across Food, Instamart, Dineout)
 - [Vercel AI SDK](https://sdk.vercel.ai/) — MCP client + `generateText` with tool use
-- [Anthropic Claude](https://anthropic.com/) — `claude-opus-4-5` for agent reasoning
+- [Anthropic Claude](https://anthropic.com/) — model configurable via `ANTHROPIC_MODEL` env var, defaults to `claude-opus-4-5`
 - [csv-parse](https://csv.js.org/parse/) — CSV parsing
 - [inquirer](https://github.com/SBoudrias/Inquirer.js) — interactive confirmation prompts
 

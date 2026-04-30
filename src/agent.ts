@@ -13,12 +13,15 @@
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { experimental_createMCPClient as createMCPClient, generateText } from "ai";
-import { Experimental_StdioMCPTransport as StdioMCPTransport } from "ai/mcp-stdio";
 import type { TeamMember, OrderSummary } from "./types.js";
 import { buildGroupSummary } from "./parser.js";
 
 const SWIGGY_FOOD_MCP_URL =
   process.env.SWIGGY_FOOD_MCP_URL ?? "https://mcp.swiggy.com/food";
+
+// Any Anthropic model ID works here. Defaults to claude-opus-4-5 but can be
+// overridden via ANTHROPIC_MODEL — e.g. claude-3-5-haiku-20241022 for lower cost.
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-5";
 
 function buildSystemPrompt(): string {
   return `You are a food ordering agent for corporate team parties on Swiggy.
@@ -138,7 +141,7 @@ export async function buildCartForGroup(
     const tools = await mcpClient.tools();
 
     const { text } = await generateText({
-      model: anthropic("claude-opus-4-5"),
+      model: anthropic(MODEL),
       tools,
       maxSteps: 20, // enough for the full flow: addresses → search → menu → cart → coupon → get_cart
       system: buildSystemPrompt(),
@@ -194,7 +197,7 @@ export async function placeOrder(summary: OrderSummary, cartCap: number = 5000):
     const tools = await mcpClient.tools();
 
     const { text } = await generateText({
-      model: anthropic("claude-opus-4-5"),
+      model: anthropic(MODEL),
       tools,
       maxSteps: 5,
       system: `You are placing a confirmed Swiggy food order.
