@@ -78,25 +78,25 @@ Suggested stack: GitHub Actions cron + Slack incoming webhook for the approval w
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                        Integration Surface                        │
+│                        Integration Surface                       │
 │         CLI  │  Slack Bot  │  Web App  │  MCP Server  │  Cron    │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
                ┌───────────────▼───────────────┐
-               │          src/agent.ts          │
+               │          src/agent.ts         │
                │                               │
-               │  buildCartForGroup()           │
+               │  buildCartForGroup()          │
                │  placeOrder()                 │
                └───────────────┬───────────────┘
                                │
        ┌───────────────────────┼───────────────────────┐
        │                       │                       │
 ┌──────▼──────┐        ┌───────▼───────┐     ┌────────▼────────┐
-│ src/parser  │        │  Vercel AI SDK │     │  Swiggy Food    │
-│             │        │  + Anthropic   │     │  MCP Server     │
-│ CSV / Sheets│        │  (any model)   │     │                 │
-│ → TeamMember│        │                │     │ get_addresses   │
-│ []          │        │                │     │ search_*        │
+│ src/parser  │        │ Vercel AI SDK │     │  Swiggy Food    │
+│             │        │ + Anthropic   │     │  MCP Server     │
+│ CSV / Sheets│        │ (any model)   │     │                 │
+│ → TeamMember│        │               │     │ get_addresses   │
+│ []          │        │               │     │ search_*        │
 └─────────────┘        └───────────────┘     │ update_cart     │
                                              │ place_order     │
                                              └─────────────────┘
@@ -231,25 +231,6 @@ for (let i = 0; i < groups.length; i++) {
   // then on confirmation:
   const orderId = await placeOrder(summary, 5000);
 }
-```
-
----
-
-## Project structure
-
-```
-swiggy-party-agent/
-├── src/
-│   ├── cli.ts        # CLI entrypoint
-│   ├── agent.ts      # buildCartForGroup(), placeOrder() — surface-agnostic
-│   ├── parser.ts     # Google Form CSV → TeamMember[]
-│   └── types.ts      # Shared types
-├── examples/
-│   ├── responses.csv              # Sample 12-person team CSV
-│   └── google-form-template.md   # Copy-paste form structure
-├── .env.example
-├── package.json
-└── tsconfig.json
 ```
 
 ---
