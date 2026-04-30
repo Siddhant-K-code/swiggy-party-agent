@@ -64,9 +64,11 @@ The agent never places an order without explicit confirmation. Cart building and
                └─────────────────────────────┘
 ```
 
-### The ₹1000 cap
+### The cart cap
 
-Swiggy Builders Club v1 has a hard ₹1000 cart cap per order. The agent automatically splits large teams into groups sized to fit within the cap based on your `--budget` per person. Each group gets its own cart and confirmation prompt.
+The cart cap defaults to ₹5000 per order and is configurable via `--cap`. The agent automatically splits large teams into groups sized to fit within the cap based on your `--budget` per person. Each group gets its own cart and confirmation prompt.
+
+Swiggy Builders Club v1 enforces a ₹1000 hard cap on sandbox accounts. Pass `--cap 1000` if you're on a sandbox `client_id`. Production `client_id`s have no enforced cap.
 
 ---
 
@@ -147,6 +149,7 @@ node dist/cli.js --csv responses.csv --event "v2.0 Launch Party" --address "Offi
 | `--event` | `"Team Party"` | Event name shown in the summary |
 | `--address` | `"Office"` | Label of the saved Swiggy delivery address |
 | `--budget` | `250` | Max spend per person in INR (used to size groups) |
+| `--cap` | `5000` | Max cart total per order in INR. Swiggy Builders Club v1 enforces ₹1000; raise this once you have a production `client_id` with no cap. |
 
 ### 4. Confirm and place
 
@@ -209,7 +212,7 @@ The agent prompt enforces these strictly: a member tagged `vegetarian` will only
 
 ## Limitations
 
-- **₹1000 cart cap**: Swiggy Builders Club v1 enforces this per order. Large teams are split automatically.
+- **Cart cap**: Defaults to ₹5000 per order. Pass `--cap 1000` if your Swiggy Builders Club plan enforces the v1 limit. Large teams are split into groups automatically.
 - **COD only**: Swiggy MCP v1 supports Cash on Delivery only. Online payment coupons are filtered out.
 - **Single restaurant per group**: Each ₹1000 cart is tied to one restaurant. The agent picks the best fit for the group.
 - **Token expiry**: Swiggy access tokens last 5 days. No automatic refresh in v1 — re-run OAuth when expired.

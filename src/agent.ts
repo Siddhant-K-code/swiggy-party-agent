@@ -40,7 +40,7 @@ Your job for each group:
 
 CRITICAL RULES:
 - NEVER call place_food_order. Cart building only.
-- Cart total must NOT exceed ₹1000 (Swiggy Builders Club v1 cap).
+- Cart total must NOT exceed the cap provided in the user prompt.
 - Only COD payment — filter out coupons that require online payment.
 - If a member has "vegetarian", "vegan", or "jain" restriction, their item MUST be marked veg.
 - If no single restaurant fits all members, pick the one that fits the most members and note exceptions.
@@ -72,7 +72,8 @@ function buildUserPrompt(
   addressLabel: string,
   maxBudgetPerPerson: number,
   groupIndex: number,
-  totalGroups: number
+  totalGroups: number,
+  cartCap: number
 ): string {
   const summary = buildGroupSummary(members);
   const memberDetails = members
@@ -97,7 +98,7 @@ function buildUserPrompt(
   return `Build a Swiggy cart for group ${groupIndex + 1} of ${totalGroups}.
 
 Delivery address label: "${addressLabel}"
-Budget per person: ₹${maxBudgetPerPerson} (hard cap: ₹1000 total for this group)
+Budget per person: ₹${maxBudgetPerPerson} (hard cap: ₹${cartCap} total for this group)
 
 ${summary}
 
@@ -112,7 +113,8 @@ export async function buildCartForGroup(
   addressLabel: string,
   maxBudgetPerPerson: number,
   groupIndex: number,
-  totalGroups: number
+  totalGroups: number,
+  cartCap: number = 5000
 ): Promise<OrderSummary> {
   const token = process.env.SWIGGY_ACCESS_TOKEN;
   if (!token) {
@@ -145,7 +147,8 @@ export async function buildCartForGroup(
         addressLabel,
         maxBudgetPerPerson,
         groupIndex,
-        totalGroups
+        totalGroups,
+        cartCap
       ),
     });
 
@@ -171,7 +174,7 @@ export async function buildCartForGroup(
 
 // Place a confirmed order. Called only after explicit team lead confirmation.
 // Handles the check-then-retry pattern for non-idempotent place_food_order.
-export async function placeOrder(summary: OrderSummary): Promise<string> {
+export async function placeOrder(summary: OrderSummary, cartCap: number = 5000): Promise<string> {
   const token = process.env.SWIGGY_ACCESS_TOKEN;
   if (!token) {
     throw new Error("SWIGGY_ACCESS_TOKEN is not set.");
@@ -197,7 +200,7 @@ export async function placeOrder(summary: OrderSummary): Promise<string> {
       system: `You are placing a confirmed Swiggy food order.
 The cart is already built. Your only job:
 1. Call get_food_cart to verify the cart is still intact.
-2. If the cart total exceeds ₹1000, respond with ERROR: cart_cap_exceeded.
+2. If the cart total exceeds ₹${cartCap}, respond with ERROR: cart_cap_exceeded.
 3. Call place_food_order with paymentMethod "COD".
 4. If place_food_order returns 5xx or network error, call get_food_orders to check if the order went through before retrying.
 5. Return ONLY the orderId as plain text, nothing else.`,

@@ -32,6 +32,7 @@ function parseArgs(): {
   event: string;
   address: string;
   budget: number;
+  cap: number;
 } {
   const args = process.argv.slice(2);
   const get = (flag: string): string | undefined => {
@@ -44,12 +45,14 @@ function parseArgs(): {
   const address = get("--address") ?? "Office";
   const budgetRaw = get("--budget");
   const budget = budgetRaw ? parseInt(budgetRaw, 10) : 250;
+  const capRaw = get("--cap");
+  const cap = capRaw ? parseInt(capRaw, 10) : 5000;
 
   if (!csv) {
     console.error(chalk.red("Error: --csv <path> is required"));
     console.error(
       chalk.dim(
-        "Usage: npx party-agent --csv responses.csv --event \"v2.0 Launch\" --address \"Office\" --budget 250"
+        "Usage: npx party-agent --csv responses.csv --event \"v2.0 Launch\" --address \"Office\" --budget 250 --cap 5000"
       )
     );
     process.exit(1);
@@ -61,23 +64,23 @@ function parseArgs(): {
     process.exit(1);
   }
 
-  return { csv: csvPath, event, address, budget };
+  return { csv: csvPath, event, address, budget, cap };
 }
 
 // ── Display helpers ────────────────────────────────────────────────────────
 
-function printBanner(eventName: string, memberCount: number, groupCount: number) {
+function printBanner(eventName: string, memberCount: number, groupCount: number, cap: number) {
   console.log();
   console.log(chalk.bold.cyan("  🎉 Swiggy Party Agent"));
   console.log(chalk.dim("  ─────────────────────────────────────────"));
   console.log(`  Event   : ${chalk.white(eventName)}`);
   console.log(`  Members : ${chalk.white(memberCount)}`);
-  console.log(`  Orders  : ${chalk.white(groupCount)} (₹1000 cap per order)`);
+  console.log(`  Orders  : ${chalk.white(groupCount)} (₹${cap} cap per order)`);
   console.log(chalk.dim("  ─────────────────────────────────────────"));
   console.log();
 }
 
-function printOrderSummary(summary: OrderSummary) {
+function printOrderSummary(summary: OrderSummary, cap: number) {
   console.log();
   console.log(
     chalk.bold(
@@ -104,12 +107,12 @@ function printOrderSummary(summary: OrderSummary) {
     );
   }
 
-  const totalColor = summary.total > 1000 ? chalk.red : chalk.bold.green;
+  const totalColor = summary.total > cap ? chalk.red : chalk.bold.green;
   console.log(`  Total   : ${totalColor(`₹${summary.total}`)}`);
 
-  if (summary.total > 1000) {
+  if (summary.total > cap) {
     console.log(
-      chalk.red("  ⚠ Total exceeds ₹1000 cap. Agent will need to adjust.")
+      chalk.red(`  ⚠ Total exceeds ₹${cap} cap. Agent will need to adjust.`)
     );
   }
 
@@ -133,7 +136,7 @@ async function confirmOrder(summary: OrderSummary): Promise<boolean> {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { csv, event, address, budget } = parseArgs();
+  const { csv, event, address, budget, cap } = parseArgs();
 
   // 1. Load and parse the CSV
   let config: ReturnType<typeof loadPartyConfig>;
@@ -148,8 +151,8 @@ async function main() {
     process.exit(1);
   }
 
-  const groups = splitIntoGroups(config.members, config.maxBudgetPerPerson);
-  printBanner(event, config.members.length, groups.length);
+  const groups = splitIntoGroups(config.members, config.maxBudgetPerPerson, cap);
+  printBanner(event, config.members.length, groups.length, cap);
 
   if (config.members.length === 0) {
     console.error(chalk.red("No members found in CSV. Check the file format."));
@@ -173,7 +176,8 @@ async function main() {
         config.deliveryAddressLabel,
         config.maxBudgetPerPerson,
         i,
-        groups.length
+        groups.length,
+        cap
       );
       spinner.succeed(
         `Cart ready: ${summary.restaurantName} — ₹${summary.total}`
@@ -185,7 +189,7 @@ async function main() {
     }
 
     // 3. Show summary and ask for confirmation
-    printOrderSummary(summary);
+    printOrderSummary(summary, cap);
     const confirmed = await confirmOrder(summary);
 
     if (!confirmed) {
@@ -197,7 +201,7 @@ async function main() {
     // 4. Place the order
     const placeSpinner = ora(`Placing order ${i + 1}...`).start();
     try {
-      const orderId = await placeOrder(summary);
+      const orderId = await placeOrder(summary, cap);
       placeSpinner.succeed(
         `Order placed! ID: ${chalk.bold.green(orderId)}`
       );

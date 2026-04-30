@@ -116,14 +116,14 @@ export function buildGroupSummary(members: TeamMember[]): string {
   return lines.join("\n");
 }
 
-// Split members into groups that fit within the ₹1000 cart cap
-// Uses maxBudgetPerPerson to estimate group size
+// Split members into groups that fit within the cart cap.
+// cartCap defaults to 5000; pass a lower value if your Swiggy plan enforces one.
 export function splitIntoGroups(
   members: TeamMember[],
-  maxBudgetPerPerson: number
+  maxBudgetPerPerson: number,
+  cartCap: number = 5000
 ): TeamMember[][] {
-  const CAP = 1000; // Swiggy Builders Club v1 hard cap
-  const membersPerGroup = Math.max(1, Math.floor(CAP / maxBudgetPerPerson));
+  const membersPerGroup = Math.max(1, Math.floor(cartCap / maxBudgetPerPerson));
   const groups: TeamMember[][] = [];
 
   for (let i = 0; i < members.length; i += membersPerGroup) {
